@@ -59,6 +59,7 @@ interface SyncStatusBadgeProps {
   isOpen: boolean;
   lockDateStr?: string; // dd/mm/yyyy
   lastSyncDateStr?: string; // dd/mm/yyyy HH:mm
+  onClick?: () => void;
 }
 
 const parseDateOnly = (dateStr: string): Date | null => {
@@ -76,7 +77,7 @@ const parseDateTime = (dateStr: string): Date | null => {
   return new Date(year, month - 1, day, hour, minute);
 };
 
-export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({ isOpen, lockDateStr, lastSyncDateStr }) => {
+export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({ isOpen, lockDateStr, lastSyncDateStr, onClick }) => {
   // Scenario C: Not Ready (Open)
   if (isOpen) {
     return <span className="text-gray-400 text-sm">-</span>;
@@ -111,8 +112,11 @@ export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({ isOpen, lockDa
   } else {
     // Scenario A: Needs Sync
     return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-        <AlertTriangle size={12} className="mr-1.5" />
+      <span 
+        onClick={onClick}
+        className="inline-flex items-center px-3 py-1 rounded text-[11px] font-bold bg-[#FFF7ED] text-[#9A3412] border border-[#FFEDD5] cursor-pointer hover:bg-[#FFEDD5] transition-colors"
+      >
+        <AlertTriangle size={12} className="mr-1 text-[#EA580C]" />
         Cần đồng bộ
       </span>
     );
