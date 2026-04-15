@@ -2,17 +2,15 @@ import React from 'react';
 
 export enum GradeLevel {
   ALL = 'ALL',
-  G1 = '1',
-  G2 = '2',
-  G3 = '3',
-  G4 = '4',
-  G5 = '5'
+  G6 = '6',
+  G7 = '7',
+  G8 = '8',
+  G9 = '9'
 }
 
 export enum Period {
-  GK1 = 'Giữa kỳ 1',
-  CK1 = 'Cuối kỳ 1',
-  GK2 = 'Giữa kỳ 2',
+  HK1 = 'Học kỳ 1',
+  HK2 = 'Học kỳ 2',
   CN = 'Cuối năm'
 }
 
