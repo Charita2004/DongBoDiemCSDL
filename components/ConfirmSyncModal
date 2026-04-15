@@ -1,0 +1,56 @@
+import React from 'react';
+import { AlertCircle } from 'lucide-react';
+
+interface ConfirmSyncModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  className: string;
+}
+
+const ConfirmSyncModal: React.FC<ConfirmSyncModalProps> = ({ isOpen, onClose, onConfirm, className }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="p-8 flex flex-col items-center text-center">
+          {/* Warning Icon */}
+          <div className="mb-6">
+            <div className="w-24 h-24 rounded-full border-4 border-[#FFD8A8] flex items-center justify-center">
+              <span className="text-[#FFA94D] text-6xl font-light">!</span>
+            </div>
+          </div>
+
+          {/* Title */}
+          <h3 className="text-[#495057] text-3xl font-bold mb-4">
+            Xác nhận đồng bộ điểm
+          </h3>
+
+          {/* Message */}
+          <p className="text-[#868E96] text-lg mb-8">
+            Đồng bộ điểm cho lớp {className}?
+          </p>
+
+          {/* Buttons */}
+          <div className="flex space-x-4 w-full">
+            <button
+              onClick={onConfirm}
+              className="flex-1 py-3 bg-[#339AF0] hover:bg-[#228BE6] text-white font-bold rounded-lg transition-colors shadow-sm text-lg"
+            >
+              Đồng bộ
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 py-3 bg-[#FA5252] hover:bg-[#F03E3E] text-white font-bold rounded-lg transition-colors shadow-sm text-lg"
+            >
+              Hủy
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ConfirmSyncModal;
