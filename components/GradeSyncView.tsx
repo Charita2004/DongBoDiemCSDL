@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import FilterBar from './FilterBar';
 import SuccessModal from './SuccessModal';
+import HistoryModal from './HistoryModal';
+import ConfirmSyncModal from './ConfirmSyncModal';
 import { BookStatusBadge, SyncStatusBadge } from './Badge';
 import { MOCK_DATA } from '../constants';
-import { GradeLevel, Period, ClassRecord } from '../types';
+import { GradeLevel, Period, ClassRecord, LockStatus } from '../types';
 import { ArrowUpDown } from 'lucide-react';
 
 // Helper to parse DD/MM/YYYY
@@ -38,15 +40,23 @@ const GradeSyncView: React.FC = () => {
 
   // State for Filters
   const [grade, setGrade] = useState<string>(GradeLevel.ALL);
-  const [period, setPeriod] = useState<Period>(Period.GK1);
+  const [period, setPeriod] = useState<Period>(Period.CN);
 
   // State for Success Modal
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [syncStats, setSyncStats] = useState({ synced: 0, total: 0 });
 
+  // State for History Modal
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [selectedClassRecord, setSelectedClassRecord] = useState<ClassRecord | null>(null);
+
+  // State for Confirm Sync Modal
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [classToSync, setClassToSync] = useState<ClassRecord | null>(null);
+
   // State for Sorting
   const [sortConfig, setSortConfig] = useState<{ key: keyof ClassRecord; direction: 'asc' | 'desc' } | null>({
-    key: 'grade',
+    key: 'className',
     direction: 'asc'
   });
 
@@ -73,35 +83,21 @@ const GradeSyncView: React.FC = () => {
         if (aValue > bValue) {
           return sortConfig.direction === 'asc' ? 1 : -1;
         }
-        
-        if (a.grade !== b.grade) {
-            return a.grade.localeCompare(b.grade);
-        }
-        return a.className.localeCompare(b.className);
+        return 0;
       });
     }
     return sortableItems;
   }, [filteredData, sortConfig]);
 
-  const requestSort = (key: keyof ClassRecord) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-  };
-
-  const handleSync = () => {
+  const handleSyncAll = () => {
     const now = new Date();
-    now.setFullYear(2026); 
-    
     const timestamp = formatDateTime(now);
     let syncedCount = 0;
     
     const updatedRecords = records.map(record => {
       const matchesFilter = grade === GradeLevel.ALL || record.grade === grade;
       if (matchesFilter) {
-        const isOpen = isBookOpen(record.unlockDate);
+        const isOpen = record.lockStatus === LockStatus.UNLOCKED;
         if (!isOpen) {
           syncedCount++;
           return { ...record, lastSyncDate: timestamp };
@@ -118,109 +114,143 @@ const GradeSyncView: React.FC = () => {
     setIsSuccessModalOpen(true);
   };
 
+  const handleSyncIndividual = () => {
+    if (!classToSync) return;
+
+    const now = new Date();
+    const timestamp = formatDateTime(now);
+    
+    const updatedRecords = records.map(record => {
+      if (record.id === classToSync.id) {
+        return { ...record, lastSyncDate: timestamp };
+      }
+      return record;
+    });
+
+    setRecords(updatedRecords);
+    setSyncStats({
+      synced: 1,
+      total: 1
+    });
+    setIsConfirmModalOpen(false);
+    setIsSuccessModalOpen(true);
+  };
+
+  const handleViewHistory = (record: ClassRecord) => {
+    setSelectedClassRecord(record);
+    setIsHistoryModalOpen(true);
+  };
+
+  const handleBadgeClick = (record: ClassRecord) => {
+    // Only show confirm modal if it needs sync (is locked and not synced or sync is old)
+    // For simplicity, we'll just check if it's locked
+    if (record.lockStatus === LockStatus.LOCKED) {
+      setClassToSync(record);
+      setIsConfirmModalOpen(true);
+    }
+  };
+
   return (
-    <div className="flex-1 flex flex-col p-6 min-h-0 overflow-hidden">
+    <div className="flex-1 flex flex-col p-6 bg-white min-h-0 overflow-hidden">
         <FilterBar 
-        grade={grade} 
-        setGrade={setGrade} 
-        period={period} 
-        setPeriod={setPeriod}
-        onSync={handleSync}
+          grade={grade} 
+          setGrade={setGrade} 
+          period={period} 
+          setPeriod={setPeriod}
+          onSync={handleSyncAll}
         />
 
-        <div className="mb-3 text-red-600 text-sm font-medium italic">
-            * Hệ thống chỉ thực hiện đồng bộ đối với các lớp có trạng thái Đã chốt sổ
+        {/* Warning Box */}
+        <div className="mb-6 p-4 border-l-4 border-red-500 bg-red-50/50 rounded-r-lg">
+            <div className="text-red-600 text-sm font-semibold mb-1">
+                * Chức năng này chỉ dành cho Sổ ghi điểm
+            </div>
+            <div className="text-red-600 text-sm font-semibold">
+                * Hệ thống chỉ thực hiện đồng bộ với các lớp có trạng thái đã chốt sổ
+            </div>
         </div>
 
-        {/* Data Table Card */}
-        <div className="flex-1 flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 min-h-0 overflow-hidden">
-        
-        {/* Scrollable Table Container */}
-        <div className="flex-1 overflow-auto">
-            <table className="min-w-full divide-y divide-gray-200 relative">
-            <thead className="bg-blue-600 sticky top-0 z-10 shadow-sm">
-                <tr>
-                <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider cursor-pointer hover:bg-blue-700 group transition-colors"
-                    onClick={() => requestSort('grade')}
-                >
-                    <div className="flex items-center">
-                    Lớp
-                    <ArrowUpDown size={14} className="ml-1 text-blue-200 group-hover:text-white" />
-                    </div>
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                    Tình trạng sổ
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                    Ngày khóa sổ lần cuối
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                    Ngày đồng bộ lần cuối
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                    Trạng thái đồng bộ
-                </th>
-                </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-                {sortedData.length > 0 ? (
-                sortedData.map((record) => {
-                    const open = isBookOpen(record.unlockDate);
-                    return (
-                    <tr key={record.id} className="hover:bg-blue-50/50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-bold text-gray-900">{record.className}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                        <BookStatusBadge isOpen={open} />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {record.lockDate || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {open ? '-' : (record.lastSyncDate || '-')}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                        <SyncStatusBadge 
-                            isOpen={open} 
-                            lockDateStr={record.lockDate} 
-                            lastSyncDateStr={record.lastSyncDate} 
-                        />
-                        </td>
-                    </tr>
-                    );
-                })
-                ) : (
-                <tr>
-                    <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
-                    Không tìm thấy dữ liệu phù hợp.
-                    </td>
-                </tr>
-                )}
-            </tbody>
-            </table>
-        </div>
-        
-        {/* Pagination Footer */}
-        <div className="flex-shrink-0 bg-white px-4 py-3 border-t border-gray-200 sm:px-6 flex items-center justify-between z-20">
-            <div className="text-sm text-gray-700">
-                Hiển thị <span className="font-medium">1</span> đến <span className="font-medium">{sortedData.length}</span> của <span className="font-medium">{records.length}</span> kết quả
+        {/* Data Table Container */}
+        <div className="flex-1 flex flex-col border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+            <div className="flex-1 overflow-auto">
+                <table className="min-w-full border-collapse">
+                    <thead className="bg-[#1E40AF] sticky top-0 z-10">
+                        <tr>
+                            <th className="px-4 py-3 text-center text-[11px] font-bold text-white uppercase border-r border-blue-400/30 w-20">LỚP</th>
+                            <th className="px-4 py-3 text-center text-[11px] font-bold text-white uppercase border-r border-blue-400/30">TÌNH TRẠNG SỔ</th>
+                            <th className="px-4 py-3 text-center text-[11px] font-bold text-white uppercase border-r border-blue-400/30">NGÀY ĐỒNG BỘ THÀNH CÔNG GẦN NHẤT</th>
+                            <th className="px-4 py-3 text-center text-[11px] font-bold text-white uppercase border-r border-blue-400/30">TRẠNG THÁI ĐỒNG BỘ</th>
+                            <th className="px-4 py-3 text-center text-[11px] font-bold text-white uppercase">LỊCH SỬ ĐỒNG BỘ</th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {sortedData.length > 0 ? (
+                            sortedData.map((record) => {
+                                const open = record.lockStatus === LockStatus.UNLOCKED;
+                                return (
+                                    <tr key={record.id} className="hover:bg-gray-50 transition-colors">
+                                        <td className="px-4 py-3 text-sm font-semibold text-gray-700 border-r border-gray-200 text-center">{record.className}</td>
+                                        <td className="px-4 py-3 text-center border-r border-gray-200">
+                                            <BookStatusBadge isOpen={open} />
+                                        </td>
+                                        <td className="px-4 py-3 text-center text-sm text-gray-500 border-r border-gray-200">
+                                            {record.lastSyncDate ? record.lastSyncDate.split(' ')[0] : '-'}
+                                        </td>
+                                        <td className="px-4 py-3 text-center border-r border-gray-200">
+                                            <SyncStatusBadge 
+                                                isOpen={open} 
+                                                lockDateStr={record.lockDate} 
+                                                lastSyncDateStr={record.lastSyncDate} 
+                                                onClick={() => handleBadgeClick(record)}
+                                            />
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            <button 
+                                                onClick={() => handleViewHistory(record)}
+                                                className="inline-flex items-center px-3 py-1 text-[11px] font-medium text-blue-700 bg-white border border-gray-200 rounded shadow-sm hover:bg-gray-50 transition-colors"
+                                            >
+                                                📜 Xem lịch sử
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        ) : (
+                            <tr>
+                                <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
+                                    Không tìm thấy dữ liệu phù hợp.
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
             </div>
-            <div className="flex space-x-2">
-                <button className="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-500 disabled:opacity-50" disabled>Trước</button>
-                <button className="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-500 hover:bg-gray-50">Sau</button>
-            </div>
-        </div>
         </div>
 
         {/* Render Success Modal */}
         <SuccessModal 
-        isOpen={isSuccessModalOpen} 
-        onClose={() => setIsSuccessModalOpen(false)}
-        syncedCount={syncStats.synced}
-        totalCount={syncStats.total}
+            isOpen={isSuccessModalOpen} 
+            onClose={() => setIsSuccessModalOpen(false)}
+            syncedCount={syncStats.synced}
+            totalCount={syncStats.total}
+        />
+
+        {/* Render History Modal */}
+        <HistoryModal 
+            isOpen={isHistoryModalOpen}
+            onClose={() => setIsHistoryModalOpen(false)}
+            className={selectedClassRecord?.className || ''}
+            history={selectedClassRecord?.lastSyncDate ? [
+                { id: '1', date: selectedClassRecord.lastSyncDate, status: 'Thành công' }
+            ] : []}
+        />
+
+        {/* Render Confirm Sync Modal */}
+        <ConfirmSyncModal 
+            isOpen={isConfirmModalOpen}
+            onClose={() => setIsConfirmModalOpen(false)}
+            onConfirm={handleSyncIndividual}
+            className={classToSync?.className || ''}
         />
     </div>
   );
