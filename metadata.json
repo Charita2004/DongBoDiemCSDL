@@ -1,5 +1,5 @@
 {
   "name": "Đồng bộ điểm",
-  "description": "Hệ thống quản lý chốt sổ và đồng bộ điểm lên CSDL ngành dành cho quản trị viên nhà trường.",
+  "description": "Đồng bộ điểm lên CSDL ngành dành cho ADMIN.",
   "requestFramePermissions": []
 }
